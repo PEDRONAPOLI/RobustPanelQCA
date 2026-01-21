@@ -1,0 +1,274 @@
+---
+title: "Panel fsQCA Workflow with RobustPanelQCA"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Panel fsQCA Workflow with RobustPanelQCA}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+This vignette demonstrates a complete panel fsQCA workflow using the RobustPanelQCA package. Panel fsQCA extends traditional fsQCA by incorporating temporal dynamics, allowing researchers to assess configurational stability across time periods and cases.
+
+The package provides three key panel metrics:
+
+- **POCONS/POCOV**: Pooled consistency and coverage (overall)
+- **BECONS/BECOV**: Between-period metrics (stability across time)
+- **WICONS/WICOV**: Within-case metrics (stability across cases)
+
+## Setup
+```{r setup, message=FALSE}
+library(RobustPanelQCA)
+
+# Load example data
+data(example_panel)
+head(example_panel)
+```
+
+## Step 1: Set Parameters
+
+First, we configure the analysis parameters:
+```{r params}
+params <- pfsqca_params(
+  incl_cut = 0.75,
+  pri_cut = 0.50,
+  n_cut = 1,
+  nec_threshold = 0.90,
+  robustness_B = 100,
+  robustness_drop = 0.10,
+  robust_PI_freq_cut = 0.80,
+  robust_nec_cut = 0.80
+)
+
+print(params)
+```
+
+## Step 2: Calibrate Data
+
+Calibrate raw values to fuzzy-set membership scores:
+```{r calibration}
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+outcome <- "entrepreneurship"
+
+data_cal <- calibrate_panel(
+ example_panel,
+ vars = c(conditions, outcome)
+)
+
+# Add identifiers back
+data_cal$case_id <- example_panel$case_id
+data_cal$period <- example_panel$period
+
+head(data_cal)
+```
+
+---
+
+## Necessity Analysis
+
+### Pooled Necessity Test
+
+Test which conditions are necessary for the outcome:
+```{r necessity}
+nec_results <- necessity_test(data_cal, outcome, conditions, params)
+knitr::kable(nec_results, digits = 3, caption = "Necessity Test Results (Pooled)")
+```
+
+**Interpretation**: A condition is considered necessary if inclN ≥ 0.90. In this example, no condition meets the strict necessity threshold.
+
+### Panel Diagnostics for Necessity
+
+Assess stability of necessity relations across time periods:
+```{r nec-between}
+nec_diag <- necessity_panel_diagnostics(
+ data_cal,
+ outcome,
+ conditions,
+ id_var = "case_id",
+ time_var = "period"
+)
+
+# Between-period necessity (BECONS_N)
+between_summary <- nec_diag$between %>%
+ dplyr::group_by(condition) %>%
+ dplyr::summarise(
+   mean_BECONS_N = mean(BECONS_N),
+   sd_BECONS_N = sd(BECONS_N),
+   min_BECONS_N = min(BECONS_N),
+   max_BECONS_N = max(BECONS_N),
+   .groups = "drop"
+ ) %>%
+ dplyr::arrange(dplyr::desc(mean_BECONS_N))
+
+knitr::kable(between_summary, digits = 3, caption = "Between-Period Necessity Stability")
+```
+
+### Necessity Robustness (ESW Random Deletion)
+
+Test robustness of necessity findings using random deletion:
+```{r nec-robustness}
+nec_rob <- necessity_robustness(data_cal, outcome, conditions, params)
+knitr::kable(nec_rob, digits = 3, caption = "Necessity Robustness Results")
+```
+
+**Interpretation**: Conditions with `robust_share` ≥ 0.80 are considered robustly necessary.
+
+---
+
+## Sufficiency Analysis
+
+### Truth Table Analysis and Minimization
+```{r sufficiency, message=FALSE}
+suf_results <- sufficiency_analysis(data_cal, outcome, conditions, params)
+```
+
+**Solution terms found:**
+```{r solution-terms}
+suf_results$terms
+```
+
+### Panel Metrics for Sufficiency
+
+Calculate pooled, between-period, and within-case metrics:
+```{r panel-metrics-pooled}
+pm <- panel_metrics(
+ data_cal,
+ outcome,
+ suf_results$terms,
+ id_var = "case_id",
+ time_var = "period"
+)
+
+knitr::kable(pm$pooled, digits = 3, caption = "Pooled Sufficiency Metrics (POCONS/POCOV)")
+```
+
+#### Between-Period Stability (BECONS/BECOV)
+```{r panel-metrics-between}
+knitr::kable(pm$between, digits = 3, caption = "Between-Period Sufficiency Metrics")
+```
+
+#### Within-Case Stability Summary
+```{r panel-metrics-within}
+within_summary <- data.frame(
+ Metric = c("Mean WICONS", "SD WICONS", "Share WICONS ≥ 0.70"),
+ Value = c(
+   round(mean(pm$within$WICONS, na.rm = TRUE), 3),
+   round(sd(pm$within$WICONS, na.rm = TRUE), 3),
+   round(mean(pm$within$WICONS >= 0.70, na.rm = TRUE), 3)
+ )
+)
+knitr::kable(within_summary, caption = "Within-Case Sufficiency Stability")
+```
+
+### Unique Coverage Analysis
+
+Analyze the unique contribution of each configuration:
+```{r coverage}
+cov_results <- unique_coverage(data_cal, outcome, suf_results$terms)
+knitr::kable(cov_results, digits = 3, caption = "Coverage Analysis")
+```
+
+### Sufficiency Robustness (ESW Random Deletion)
+
+Test robustness of sufficient configurations:
+```{r suf-robustness}
+suf_rob <- sufficiency_robustness(data_cal, outcome, conditions, params)
+
+# Show frequency table
+knitr::kable(
+ suf_rob$freq_tbl %>% head(10),
+ digits = 3,
+ caption = "Prime Implicant Frequency (Top 10)"
+)
+```
+
+#### Robust Configurations
+
+Configurations appearing in ≥ 80% of iterations:
+```{r robust-terms}
+robust_terms <- suf_rob$freq_tbl %>%
+ dplyr::filter(freq >= params$robust_PI_freq_cut)
+
+if (nrow(robust_terms) > 0) {
+ knitr::kable(robust_terms, digits = 3, caption = "Robust Sufficient Configurations")
+} else {
+ cat("No configurations met the 80% robustness threshold.\n")
+ cat("Showing baseline terms instead:\n")
+ print(suf_rob$baseline_terms)
+}
+```
+
+---
+
+## Summary Report
+```{r summary}
+# Solution-level summary
+sol_metrics <- pm$pooled %>% dplyr::filter(component == "solution")
+POCONS <- as.numeric(sol_metrics$POCONS)
+POCOV <- as.numeric(sol_metrics$POCOV)
+
+share_years_ok <- mean(pm$between$BECONS >= 0.70, na.rm = TRUE)
+share_cases_ok <- mean(pm$within$WICONS >= 0.70, na.rm = TRUE)
+
+cat("=== SUFFICIENCY SUMMARY ===\n")
+cat(sprintf("Pooled: POCONS = %.3f, POCOV = %.3f\n", POCONS, POCOV))
+cat(sprintf("Between-period stability: %.0f%% of periods with BECONS ≥ 0.70\n", share_years_ok * 100))
+cat(sprintf("Within-case stability: %.0f%% of cases with WICONS ≥ 0.70\n", share_cases_ok * 100))
+cat(sprintf("\nNumber of solution terms: %d\n", length(suf_results$terms)))
+cat(sprintf("Number of robust terms (freq ≥ %.0f%%): %d\n",
+           params$robust_PI_freq_cut * 100,
+           sum(suf_rob$freq_tbl$freq >= params$robust_PI_freq_cut)))
+
+cat("\n=== NECESSITY SUMMARY ===\n")
+nec_conditions <- nec_results %>% dplyr::filter(nec_flag == TRUE)
+if (nrow(nec_conditions) > 0) {
+ cat("Necessary conditions (inclN ≥ 0.90):\n")
+ print(nec_conditions)
+} else {
+ cat("No necessary conditions found (inclN ≥ 0.90)\n")
+}
+
+robust_nec <- nec_rob %>% dplyr::filter(robust_nec_flag == TRUE)
+if (nrow(robust_nec) > 0) {
+ cat("\nRobust necessary conditions:\n")
+ print(robust_nec)
+} else {
+ cat("No robust necessary conditions found\n")
+}
+```
+
+---
+
+## Interpretation Guidelines
+
+### Consistency Thresholds
+
+- **POCONS ≥ 0.75**: Acceptable pooled consistency for sufficiency
+- **BECONS stable across periods**: Indicates temporal stability
+- **WICONS stable across cases**: Indicates cross-case generalizability
+- **inclN ≥ 0.90**: Standard threshold for necessity
+
+### Robustness Criteria (Emmenegger, Schraff & Walter)
+
+- **Sufficiency**: Terms appearing in ≥ 80% of random deletion iterations are considered robust
+- **Necessity**: Conditions meeting the necessity threshold in ≥ 80% of iterations are robustly necessary
+
+### Panel Metrics Interpretation
+
+| Metric | Meaning |
+|--------|---------|
+| POCONS | Overall consistency of the solution across all observations |
+| POCOV | Overall coverage of the solution |
+| BECONS | Consistency within each time period (temporal stability) |
+| WICONS | Consistency within each case across time (case stability) |
+
+## References
+- Ragin, C. C. (2008). *Redesigning Social Inquiry*. University of Chicago Press.
+- Emmenegger, P., Schraff, D., & Walter, A. (2014). QCA, the truth table analysis and large-N survey data. *COMPASSS Working Paper*.

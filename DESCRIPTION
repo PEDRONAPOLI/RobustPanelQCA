@@ -21,11 +21,15 @@ Depends:
     R (>= 4.1.0)
 Imports: 
     dplyr,
+    magrittr,
     purrr,
     QCA,
     stringr,
     tibble
 LazyData: true
 Suggests: 
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+VignetteBuilder: knitr
