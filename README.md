@@ -15,10 +15,11 @@ RobustPanelQCA implements panel fuzzy-set Qualitative Comparative Analysis (fsQC
 
 ## Installation
 
-You can install the development version of RobustPanelQCA from GitHub:
+You can install and run the development version of RobustPanelQCA from GitHub:
 ```r
 # install.packages("pak")
 pak::pak("PEDRONAPOLI/RobustPanelQCA")
+library(RobustPanelQCA)
 ```
 
 ## Basic Usage

@@ -2,7 +2,8 @@
 #'
 #' @description
 #' Tests robustness of sufficient configurations by randomly deleting
-#' observations and re-running the analysis multiple times.
+#' observations and re-running the analysis multiple times. When directional
+#' expectations are provided, tests the intermediate solution.
 #'
 #' @param data A data frame with calibrated fuzzy-set variables.
 #' @param outcome Character. Name of the outcome variable.
@@ -13,6 +14,7 @@
 #' \describe{
 #'   \item{baseline_terms}{Terms from the original analysis}
 #'   \item{freq_tbl}{Data frame with term frequencies across iterations}
+#'   \item{solution_type}{Character indicating "parsimonious" or "intermediate"}
 #' }
 #'
 #' @details
@@ -41,6 +43,7 @@ sufficiency_robustness <- function(data, outcome, conditions, params = NULL) {
   # Baseline run
   base_run <- sufficiency_analysis(data, outcome, conditions, params)
   base_terms <- unique(base_run$terms)
+  solution_type <- if (!is.null(params$dir_exp)) "intermediate" else "parsimonious"
 
   # Random deletion iterations
   all_terms <- vector("list", params$robustness_B)
@@ -67,7 +70,11 @@ sufficiency_robustness <- function(data, outcome, conditions, params = NULL) {
       in_baseline = term %in% base_terms
     )
 
-  list(baseline_terms = base_terms, freq_tbl = freq_tbl)
+  list(
+    baseline_terms = base_terms,
+    freq_tbl = freq_tbl,
+    solution_type = solution_type
+  )
 }
 
 

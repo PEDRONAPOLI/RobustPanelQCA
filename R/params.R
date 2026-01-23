@@ -22,15 +22,21 @@
 #'   Default is 0.80.
 #' @param robust_nec_cut Numeric. Minimum share for robust necessity.
 #'   Default is 0.80.
+#' @param dir_exp Named list or NULL. Directional expectations for intermediate solution.
+#'   Names should match condition names, values should be 1 (expect presence contributes to outcome),
+#'   0 (expect absence contributes), or -1 (no expectation). Default is NULL (parsimonious only).
 #'
 #' @return A list of class \code{pfsqca_params} containing all parameters.
 #'
 #' @examples
-#' # Default parameters
+#' # Default parameters (parsimonious solution only)
 #' params <- pfsqca_params()
 #'
-#' # Custom parameters
-#' params <- pfsqca_params(incl_cut = 0.75, robustness_B = 500)
+#' # With directional expectations for intermediate solution
+#' params <- pfsqca_params(
+#'   incl_cut = 0.75,
+#'   dir_exp = c(income = 1, patents = 1, density = 0)
+#' )
 #'
 #' @export
 pfsqca_params <- function(
@@ -42,7 +48,8 @@ pfsqca_params <- function(
     robustness_drop = 0.10,
     robustness_seed = 123L,
     robust_PI_freq_cut = 0.80,
-    robust_nec_cut = 0.80
+    robust_nec_cut = 0.80,
+    dir_exp = NULL
 ) {
 
   params <- list(
@@ -54,7 +61,8 @@ pfsqca_params <- function(
     robustness_drop = robustness_drop,
     robustness_seed = as.integer(robustness_seed),
     robust_PI_freq_cut = robust_PI_freq_cut,
-    robust_nec_cut = robust_nec_cut
+    robust_nec_cut = robust_nec_cut,
+    dir_exp = dir_exp
   )
 
   class(params) <- "pfsqca_params"
@@ -88,6 +96,18 @@ print.pfsqca_params <- function(x, ...) {
   cat("  robustness_seed:", x$robustness_seed, "\n")
   cat("  robust_PI_freq_cut:", x$robust_PI_freq_cut, "\n")
   cat("  robust_nec_cut:", x$robust_nec_cut, "\n")
+
+  cat("\nDirectional expectations:\n")
+  if (is.null(x$dir_exp)) {
+    cat("  None (parsimonious solution only)\n")
+  } else {
+    for (nm in names(x$dir_exp)) {
+      direction <- if (x$dir_exp[[nm]] == 1) "presence (+)"
+      else if (x$dir_exp[[nm]] == 0) "absence (-)"
+      else "no expectation"
+      cat("  ", nm, ":", direction, "\n")
+    }
+  }
 
   invisible(x)
 }

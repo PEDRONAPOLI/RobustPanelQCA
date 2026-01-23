@@ -1,0 +1,5 @@
+usethis::use_git() - Comit
+
+gert::git_push() - Push
+
+https://cran.r-project.org/bin/windows/Rtools/ - Rtools 4.5
