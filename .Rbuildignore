@@ -3,3 +3,10 @@
 ^data-raw$
 ^doc$
 ^Meta$
+^\.github$
+^\.claude$
+^GUIDE\.md$
+^dev$
+^\.Rhistory$
+^pfsqca_results$
+^results$

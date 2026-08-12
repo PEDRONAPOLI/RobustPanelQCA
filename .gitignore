@@ -1,9 +1,17 @@
 .Rproj.user
 .Rhistory
 .RData
+.Rapp.history
 .httr-oauth
 .DS_Store
 .quarto
+.claude
 inst/doc
 /doc/
 /Meta/
+*.Rcheck/
+*.tar.gz
+
+# Output produced by running an analysis
+/results/
+/pfsqca_results/

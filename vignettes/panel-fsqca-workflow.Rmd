@@ -32,12 +32,40 @@ data(example_panel)
 head(example_panel)
 ```
 
+The example data is fictional, and it was built with two genuine routes to a
+high outcome: `infrastructure * knowledge`, and `finance * talent`. Because
+either route is enough on its own, no single condition should come out as
+necessary. Keep that in mind as a benchmark for what follows.
+
+## The short version
+
+If you only want the results, `run_pfsqca()` performs every step in this
+vignette in a single call:
+
+```{r shortcut, eval=FALSE}
+res <- run_pfsqca(
+  data       = example_panel,
+  outcome    = "entrepreneurship",
+  conditions = c("infrastructure", "knowledge", "finance", "talent"),
+  id_var     = "case_id",
+  time_var   = "period",
+  params     = pfsqca_params(incl_cut = 0.80, n_cut = 1)
+)
+
+res                        # console summary
+export_pfsqca(res)         # CSV tables
+pfsqca_report(res)         # HTML report
+```
+
+The rest of this vignette walks through the same analysis step by step, which
+is what you want when you need to justify each decision in a paper.
+
 ## Step 1: Set Parameters
 
 First, we configure the analysis parameters:
 ```{r params}
 params <- pfsqca_params(
-  incl_cut = 0.75,
+  incl_cut = 0.80,
   pri_cut = 0.50,
   n_cut = 1,
   nec_threshold = 0.90,
@@ -62,12 +90,12 @@ data_cal <- calibrate_panel(
  vars = c(conditions, outcome)
 )
 
-# Add identifiers back
-data_cal$case_id <- example_panel$case_id
-data_cal$period <- example_panel$period
-
 head(data_cal)
 ```
+
+Only the variables listed in `vars` are transformed; `case_id` and `period` are
+carried through untouched. Calibration uses the pooled panel, so a membership
+score of 0.8 means the same thing in every period.
 
 ---
 
