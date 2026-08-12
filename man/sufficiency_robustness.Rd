@@ -20,11 +20,13 @@ A list with:
 \describe{
 \item{baseline_terms}{Terms from the original analysis}
 \item{freq_tbl}{Data frame with term frequencies across iterations}
+\item{solution_type}{Character indicating "parsimonious" or "intermediate"}
 }
 }
 \description{
 Tests robustness of sufficient configurations by randomly deleting
-observations and re-running the analysis multiple times.
+observations and re-running the analysis multiple times. When directional
+expectations are provided, tests the intermediate solution.
 }
 \details{
 For each iteration, a proportion of cases (defined by params$robustness_drop)
@@ -35,9 +37,15 @@ Terms appearing in >= params$robust_PI_freq_cut of iterations are
 considered robust.
 }
 \examples{
-\dontrun{
-params <- pfsqca_params(robustness_B = 100)  # fewer iterations for testing
-rob <- sufficiency_robustness(data_cal, "outcome", conditions, params)
+\donttest{
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+# Few iterations here so the example runs fast; use 999 for real work.
+params <- pfsqca_params(incl_cut = 0.80, n_cut = 1, robustness_B = 20)
+rob <- sufficiency_robustness(data_cal, "entrepreneurship", conditions, params)
 rob$freq_tbl  # see which terms are robust
 }
 

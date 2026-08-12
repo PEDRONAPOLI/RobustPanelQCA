@@ -23,10 +23,8 @@ For a positive literal (e.g., "income"), returns the values as-is.
 For a negated literal (e.g., "~income"), returns 1 - values.
 }
 \examples{
-\dontrun{
-data_cal <- calibrate_panel(data, c("income", "patents"))
-literal_membership(data_cal, "income")   # presence
-literal_membership(data_cal, "~income")  # absence
-}
+data_cal <- calibrate_panel(example_panel, vars = "infrastructure")
+head(literal_membership(data_cal, "infrastructure"))   # presence
+head(literal_membership(data_cal, "~infrastructure"))  # absence
 
 }

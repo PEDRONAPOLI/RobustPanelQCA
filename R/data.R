@@ -1,7 +1,7 @@
 #' Example Panel Dataset for fsQCA
 #'
-#' A simulated panel dataset with 30 cases across 3 time periods,
-#' designed to demonstrate panel fsQCA analysis.
+#' A fictional panel of 30 regional innovation ecosystems observed over
+#' 3 periods (90 observations), built to demonstrate panel fsQCA.
 #'
 #' @format A data frame with 90 rows and 7 variables:
 #' \describe{
@@ -14,18 +14,45 @@
 #'   \item{entrepreneurship}{Outcome variable (0-100)}
 #' }
 #'
+#' @details
+#' The data was generated with two genuine sufficient paths to a high outcome:
+#'
+#' \itemize{
+#'   \item `infrastructure * knowledge` - technology-driven ecosystems
+#'   \item `finance * talent` - capital and people driven ecosystems
+#' }
+#'
+#' Because either path is enough on its own, no single condition is necessary.
+#' A correct analysis of this data therefore recovers two sufficient paths and
+#' zero necessary conditions, which makes it a useful teaching example for
+#' equifinality (several routes to the same outcome) and conjunctural causation
+#' (conditions matter in combination, not one at a time).
+#'
+#' Cases carry a persistent case-level component, so a case that scores high in
+#' period 1 tends to score high later as well. That persistence is what gives
+#' the within-case metrics (WICONS) something to measure.
+#'
+#' The same data ships as a plain CSV, to show the input layout the package
+#' expects:
+#' `system.file("extdata", "example_panel.csv", package = "RobustPanelQCA")`
+#'
 #' @examples
 #' data(example_panel)
 #' head(example_panel)
 #'
-#' # Calibrate and run analysis
-#' params <- pfsqca_params()
-#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
-#'
-#' data_cal <- calibrate_panel(
-#'   example_panel,
-#'   vars = c(conditions, "entrepreneurship")
+#' # The full workflow in one call
+#' \donttest{
+#' res <- run_pfsqca(
+#'   data       = example_panel,
+#'   outcome    = "entrepreneurship",
+#'   conditions = c("infrastructure", "knowledge", "finance", "talent"),
+#'   params     = pfsqca_params(incl_cut = 0.80, n_cut = 1),
+#'   robustness = FALSE
 #' )
+#' res
+#' }
 #'
-#' @source Simulated data for demonstration purposes.
+#' @source Simulated data for demonstration purposes. See
+#'   `data-raw/example_panel.R` in the package sources for the exact
+#'   data-generating process.
 "example_panel"

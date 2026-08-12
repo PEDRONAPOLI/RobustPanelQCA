@@ -14,11 +14,9 @@
 #' For a negated literal (e.g., "~income"), returns 1 - values.
 #'
 #' @examples
-#' \dontrun{
-#' data_cal <- calibrate_panel(data, c("income", "patents"))
-#' literal_membership(data_cal, "income")   # presence
-#' literal_membership(data_cal, "~income")  # absence
-#' }
+#' data_cal <- calibrate_panel(example_panel, vars = "infrastructure")
+#' head(literal_membership(data_cal, "infrastructure"))   # presence
+#' head(literal_membership(data_cal, "~infrastructure"))  # absence
 #'
 #' @export
 literal_membership <- function(data, lit) {
@@ -48,11 +46,12 @@ literal_membership <- function(data, lit) {
 #' of membership scores across all literals in the term.
 #'
 #' @examples
-#' \dontrun{
-#' data_cal <- calibrate_panel(data, c("income", "patents", "density"))
-#' term_membership(data_cal, "income*patents")
-#' term_membership(data_cal, "income*~density")
-#' }
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c("infrastructure", "knowledge", "finance")
+#' )
+#' head(term_membership(data_cal, "infrastructure*knowledge"))
+#' head(term_membership(data_cal, "infrastructure*~finance"))
 #'
 #' @export
 term_membership <- function(data, term) {
@@ -82,10 +81,11 @@ term_membership <- function(data, term) {
 #' \code{terms = c("A*B", "C*~D")}
 #'
 #' @examples
-#' \dontrun{
-#' data_cal <- calibrate_panel(data, c("A", "B", "C", "D"))
-#' solution_membership(data_cal, c("A*B", "C*~D"))
-#' }
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(example_panel, vars = conditions)
+#' head(solution_membership(
+#'   data_cal, c("infrastructure*knowledge", "finance*talent")
+#' ))
 #'
 #' @export
 solution_membership <- function(data, terms) {

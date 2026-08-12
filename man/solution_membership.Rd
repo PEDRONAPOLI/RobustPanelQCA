@@ -26,9 +26,10 @@ A solution like "A\emph{B + C}~D" would be passed as:
 \code{terms = c("A*B", "C*~D")}
 }
 \examples{
-\dontrun{
-data_cal <- calibrate_panel(data, c("A", "B", "C", "D"))
-solution_membership(data_cal, c("A*B", "C*~D"))
-}
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(example_panel, vars = conditions)
+head(solution_membership(
+  data_cal, c("infrastructure*knowledge", "finance*talent")
+))
 
 }

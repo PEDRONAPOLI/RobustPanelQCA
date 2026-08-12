@@ -13,7 +13,8 @@ pfsqca_params(
   robustness_drop = 0.1,
   robustness_seed = 123L,
   robust_PI_freq_cut = 0.8,
-  robust_nec_cut = 0.8
+  robust_nec_cut = 0.8,
+  dir_exp = NULL
 )
 }
 \arguments{
@@ -43,6 +44,10 @@ Default is 0.80.}
 
 \item{robust_nec_cut}{Numeric. Minimum share for robust necessity.
 Default is 0.80.}
+
+\item{dir_exp}{Named list or NULL. Directional expectations for intermediate solution.
+Names should match condition names, values should be 1 (expect presence contributes to outcome),
+0 (expect absence contributes), or -1 (no expectation). Default is NULL (parsimonious only).}
 }
 \value{
 A list of class \code{pfsqca_params} containing all parameters.
@@ -52,10 +57,13 @@ Creates a parameter object for panel fsQCA analysis with default values
 that can be customized.
 }
 \examples{
-# Default parameters
+# Default parameters (parsimonious solution only)
 params <- pfsqca_params()
 
-# Custom parameters
-params <- pfsqca_params(incl_cut = 0.75, robustness_B = 500)
+# With directional expectations for intermediate solution
+params <- pfsqca_params(
+  incl_cut = 0.75,
+  dir_exp = c(income = 1, patents = 1, density = 0)
+)
 
 }

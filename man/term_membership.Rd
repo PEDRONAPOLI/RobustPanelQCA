@@ -24,10 +24,11 @@ In fuzzy-set logic, conjunction (AND) is calculated as the minimum
 of membership scores across all literals in the term.
 }
 \examples{
-\dontrun{
-data_cal <- calibrate_panel(data, c("income", "patents", "density"))
-term_membership(data_cal, "income*patents")
-term_membership(data_cal, "income*~density")
-}
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c("infrastructure", "knowledge", "finance")
+)
+head(term_membership(data_cal, "infrastructure*knowledge"))
+head(term_membership(data_cal, "infrastructure*~finance"))
 
 }

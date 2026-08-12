@@ -23,9 +23,12 @@ A data frame with necessity test results for each condition
 Tests whether conditions are necessary for the outcome.
 }
 \examples{
-\dontrun{
-params <- pfsqca_params()
-nec <- necessity_test(data_cal, "outcome", c("income", "patents"), params)
-}
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c("infrastructure", "knowledge", "entrepreneurship")
+)
+necessity_test(
+  data_cal, "entrepreneurship", c("infrastructure", "knowledge")
+)
 
 }

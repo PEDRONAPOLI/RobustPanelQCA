@@ -26,15 +26,23 @@
 #' considered robust.
 #'
 #' @examples
-#' \dontrun{
-#' params <- pfsqca_params(robustness_B = 100)  # fewer iterations for testing
-#' rob <- sufficiency_robustness(data_cal, "outcome", conditions, params)
+#' \donttest{
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
+#' # Few iterations here so the example runs fast; use 999 for real work.
+#' params <- pfsqca_params(incl_cut = 0.80, n_cut = 1, robustness_B = 20)
+#' rob <- sufficiency_robustness(data_cal, "entrepreneurship", conditions, params)
 #' rob$freq_tbl  # see which terms are robust
 #' }
 #'
 #' @export
 sufficiency_robustness <- function(data, outcome, conditions, params = NULL) {
   if (is.null(params)) params <- pfsqca_params()
+  check_columns(data, c(outcome, conditions), "variable")
+  check_calibrated(data, c(outcome, conditions))
 
   set.seed(params$robustness_seed)
   n <- nrow(data)
@@ -97,15 +105,19 @@ sufficiency_robustness <- function(data, outcome, conditions, params = NULL) {
 #' }
 #'
 #' @examples
-#' \dontrun{
-#' params <- pfsqca_params(robustness_B = 100)
-#' rob_nec <- necessity_robustness(data_cal, "outcome", conditions, params)
-#' rob_nec  # see which conditions are robustly necessary
-#' }
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
+#' params <- pfsqca_params(robustness_B = 50)
+#' necessity_robustness(data_cal, "entrepreneurship", conditions, params)
 #'
 #' @export
 necessity_robustness <- function(data, outcome, conditions, params = NULL) {
   if (is.null(params)) params <- pfsqca_params()
+  check_columns(data, c(outcome, conditions), "variable")
+  check_calibrated(data, c(outcome, conditions))
 
   set.seed(params$robustness_seed)
   n <- nrow(data)

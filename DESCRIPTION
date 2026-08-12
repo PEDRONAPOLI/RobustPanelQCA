@@ -1,6 +1,6 @@
 Package: RobustPanelQCA
 Title: Robust Panel Fuzzy-Set Qualitative Comparative Analysis
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: 
     person("Pedro Henrique", "Napoli", 
            email = "pedrohenriquenapoli@gmail.com", 
@@ -9,8 +9,10 @@ Authors@R:
 Description: Implements panel fuzzy-set Qualitative Comparative Analysis 
     (fsQCA) with comprehensive robustness testing. Provides pooled (POCONS), 
     between-period (BECONS), and within-case (WICONS) consistency metrics 
-    for evaluating configurational stability across time and units. Includes 
-    random deletion robustness testing for both necessity and sufficiency.
+    for evaluating configurational stability across time and units. Includes
+    random deletion robustness testing for both necessity and sufficiency, a
+    single-call workflow with an HTML report, and a fill-in-the-blanks script
+    for users who do not write R.
 License: GPL-3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -27,8 +29,9 @@ Imports:
     stringr,
     tibble
 LazyData: true
-Suggests: 
+Suggests:
     knitr,
+    readxl,
     rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

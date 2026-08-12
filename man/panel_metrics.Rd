@@ -4,7 +4,13 @@
 \alias{panel_metrics}
 \title{Panel Metrics for Sufficiency}
 \usage{
-panel_metrics(data, outcome, sol_terms, id_var = "MSA", time_var = "year")
+panel_metrics(
+  data,
+  outcome,
+  sol_terms,
+  id_var = "case_id",
+  time_var = "period"
+)
 }
 \arguments{
 \item{data}{A data frame with calibrated fuzzy-set variables.}
@@ -13,9 +19,10 @@ panel_metrics(data, outcome, sol_terms, id_var = "MSA", time_var = "year")
 
 \item{sol_terms}{Character vector. Solution terms from sufficiency analysis.}
 
-\item{id_var}{Character. Name of the case identifier variable. Default is "MSA".}
+\item{id_var}{Character. Name of the case identifier variable.
+Default is "case_id".}
 
-\item{time_var}{Character. Name of the time variable. Default is "year".}
+\item{time_var}{Character. Name of the time variable. Default is "period".}
 }
 \value{
 A list with three data frames:
@@ -24,18 +31,24 @@ A list with three data frames:
 \item{between}{BECONS and BECOV by time period}
 \item{within}{WICONS and WICOV by case}
 }
+The grouping column keeps the name you passed in \code{time_var} / \code{id_var}.
 }
 \description{
 Calculates pooled, between-period, and within-case consistency and coverage
 metrics for sufficient configurations.
 }
 \examples{
-\dontrun{
-suf <- sufficiency_analysis(data_cal, "outcome", conditions, params)
-pm <- panel_metrics(data_cal, "outcome", suf$terms)
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+pm <- panel_metrics(
+  data_cal, "entrepreneurship",
+  sol_terms = c("infrastructure*knowledge", "finance*talent")
+)
 pm$pooled   # overall metrics
-pm$between  # by year
-pm$within   # by case
-}
+pm$between  # by period
+head(pm$within)  # by case
 
 }

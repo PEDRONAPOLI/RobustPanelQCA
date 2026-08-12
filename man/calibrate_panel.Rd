@@ -21,10 +21,18 @@ A data frame with calibrated variables (original values replaced).
 Calibrates multiple variables in a data frame to fuzzy-set membership
 scores using percentile-based thresholds.
 }
-\examples{
-\dontrun{
-# Calibrate conditions and outcome
-data_cal <- calibrate_panel(data, c("income", "patents", "outcome"))
+\details{
+Calibration is applied to the pooled panel: all case-period observations of
+a variable share the same anchors, so a membership score of 0.8 means the
+same thing in period 1 and in period 3. Columns not listed in \code{vars}
+(identifiers, time, labels) are carried through untouched.
 }
+\examples{
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+head(data_cal)
 
 }

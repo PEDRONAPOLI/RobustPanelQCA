@@ -22,22 +22,28 @@
 #' not by any other term in the solution.
 #'
 #' @examples
-#' \dontrun{
-#' suf <- sufficiency_analysis(data_cal, "outcome", conditions, params)
-#' cov <- unique_coverage(data_cal, "outcome", suf$terms)
-#' cov  # see coverage breakdown
-#' }
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
+#' unique_coverage(
+#'   data_cal, "entrepreneurship",
+#'   terms = c("infrastructure*knowledge", "finance*talent")
+#' )
 #'
 #' @export
 unique_coverage <- function(data, outcome, terms) {
+  check_columns(data, outcome, "outcome")
   Y <- data[[outcome]]
   if (length(terms) == 0) return(tibble::tibble())
 
   Xlist <- purrr::map(terms, ~ term_membership(data, .x))
   names(Xlist) <- terms
 
-  raw_cov <- purrr::map_dbl(Xlist, ~ cons_cov_suf(.x, Y)["coverage"])
-  cons <- purrr::map_dbl(Xlist, ~ cons_cov_suf(.x, Y)["consistency"])
+  cc <- purrr::map(Xlist, ~ cons_cov_suf(.x, Y))
+  raw_cov <- purrr::map_dbl(cc, "coverage")
+  cons <- purrr::map_dbl(cc, "consistency")
 
   unique_cov <- purrr::map_dbl(seq_along(terms), function(i) {
     Xi <- Xlist[[i]]

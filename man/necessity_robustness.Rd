@@ -28,10 +28,12 @@ Tests robustness of necessity findings by randomly deleting
 observations and re-testing necessity multiple times.
 }
 \examples{
-\dontrun{
-params <- pfsqca_params(robustness_B = 100)
-rob_nec <- necessity_robustness(data_cal, "outcome", conditions, params)
-rob_nec  # see which conditions are robustly necessary
-}
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+params <- pfsqca_params(robustness_B = 50)
+necessity_robustness(data_cal, "entrepreneurship", conditions, params)
 
 }

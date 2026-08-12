@@ -1,0 +1,301 @@
+---
+params:
+  res_path: NULL
+  title: "Panel fsQCA Report"
+title: "`r params$title`"
+date: "`r format(Sys.time(), '%d %B %Y, %H:%M')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: flatly
+    df_print: kable
+    self_contained: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+res <- readRDS(params$res_path)
+p <- res$params
+
+fmt <- function(v, d = 3) round(as.numeric(v), d)
+tbl <- function(x, caption = NULL) {
+  if (is.null(x) || nrow(x) == 0) return(cat("_No rows to show._\n"))
+  knitr::kable(as.data.frame(x), digits = 3, caption = caption)
+}
+```
+
+<style>
+.reading { background: #f4f8fb; border-left: 4px solid #2c7fb8; padding: 10px 14px; margin: 12px 0; }
+.warnbox { background: #fff8e6; border-left: 4px solid #e0a800; padding: 10px 14px; margin: 12px 0; }
+</style>
+
+## What was analysed
+
+```{r overview}
+data.frame(
+  Item = c("Outcome", "Conditions", "Cases", "Periods", "Observations",
+           "Calibration", "Solution type"),
+  Value = c(
+    res$outcome,
+    paste(res$conditions, collapse = ", "),
+    length(unique(res$data_raw[[res$id_var]])),
+    length(unique(res$data_raw[[res$time_var]])),
+    nrow(res$data_raw),
+    if (isTRUE(res$calibrated)) "percentile-based (applied by the package)" else "data was already calibrated",
+    res$solution_type
+  ),
+  stringsAsFactors = FALSE
+)
+```
+
+**Thresholds used**
+
+```{r params-tbl}
+data.frame(
+  Parameter = c("Consistency cutoff (incl_cut)", "PRI cutoff (pri_cut)",
+                "Minimum cases per row (n_cut)", "Necessity threshold",
+                "Robustness runs", "Share of cases dropped per run",
+                "Robustness cutoff (sufficiency)", "Robustness cutoff (necessity)"),
+  Value = c(p$incl_cut, p$pri_cut, p$n_cut, p$nec_threshold,
+            p$robustness_B, p$robustness_drop,
+            p$robust_PI_freq_cut, p$robust_nec_cut),
+  stringsAsFactors = FALSE
+)
+```
+
+---
+
+## 1. Necessary conditions
+
+A condition is **necessary** when the outcome practically never occurs without
+it. In set terms: whenever the outcome is high, that condition is at least as
+high. The test statistic is `inclN`; the usual bar is **0.90**.
+
+```{r nec}
+tbl(res$necessity)
+```
+
+<div class="reading">
+**How to read this.** `inclN` is the consistency of the necessity claim, and
+`covN` tells you whether the claim is *trivial*: a condition present in
+literally every case would score a perfect `inclN` while explaining nothing, and
+a low `covN` is the warning sign for that. A `~` prefix means the **absence** of
+the condition.
+</div>
+
+```{r nec-verdict, results = "asis"}
+nec_found <- res$necessity[res$necessity$nec_flag, , drop = FALSE]
+if (nrow(nec_found) == 0) {
+  cat(sprintf(
+    "**Verdict: no necessary condition.** The highest score is `%s` at inclN = %s, below the %s threshold. Nothing in this set of conditions is indispensable for the outcome, which is itself a substantive finding: there is more than one way to get there.\n",
+    res$necessity$condition[1], fmt(res$necessity$inclN[1]), p$nec_threshold))
+} else {
+  cat(sprintf("**Verdict: %d condition(s) pass the necessity threshold:** %s.\n\n",
+              nrow(nec_found), paste0("`", nec_found$condition, "`", collapse = ", ")))
+  cat("Check the `covN` column before making much of it - a necessary condition with low coverage is trivially necessary.\n")
+}
+```
+
+### 1.1 Is necessity stable over time and across cases?
+
+```{r nec-panel}
+between_summary <- res$necessity_panel$between
+if (!is.null(between_summary) && nrow(between_summary) > 0) {
+  agg <- stats::aggregate(
+    BECONS_N ~ condition, data = as.data.frame(between_summary),
+    FUN = function(v) c(mean = mean(v), min = min(v), max = max(v))
+  )
+  out <- data.frame(
+    condition = agg$condition,
+    mean_BECONS_N = fmt(agg$BECONS_N[, "mean"]),
+    min_BECONS_N  = fmt(agg$BECONS_N[, "min"]),
+    max_BECONS_N  = fmt(agg$BECONS_N[, "max"]),
+    stringsAsFactors = FALSE
+  )
+  out <- out[order(-out$mean_BECONS_N), ]
+  knitr::kable(out, row.names = FALSE,
+               caption = "Necessity consistency computed separately within each period")
+}
+```
+
+<div class="reading">
+**How to read this.** A condition whose `BECONS_N` stays flat across periods is
+behaving consistently over time. A wide gap between `min` and `max` means the
+relationship holds in some periods and not others - report that instead of the
+pooled number alone.
+</div>
+
+### 1.2 Necessity under random deletion
+
+```{r nec-rob, results = "asis"}
+if (is.null(res$necessity_robustness)) {
+  cat("_Robustness testing was switched off for this run._\n")
+} else {
+  print(tbl(res$necessity_robustness))
+  cat(sprintf("\n<div class=\"reading\">\n**How to read this.** Each of the %d runs deletes a random %.0f%% of the observations and re-tests necessity. `robust_share` is the fraction of runs in which the condition still cleared inclN >= %s. A finding that only appears when every case is present is a finding driven by a handful of cases.\n</div>\n",
+              p$robustness_B, p$robustness_drop * 100, p$nec_threshold))
+}
+```
+
+---
+
+## 2. Sufficient paths to the outcome
+
+These are the combinations of conditions that are **enough** to produce the
+outcome. Several different paths can coexist - that is *equifinality*, and it is
+the reason to use QCA in the first place.
+
+```{r suf-terms, results = "asis"}
+cat(sprintf("**Solution (%s):**\n\n", res$solution_type))
+cat(paste0("- `", res$terms, "`", collapse = "\n"), "\n\n")
+cat("Read `*` as AND, and `~` as the absence of the condition. Each bullet is an alternative route to the outcome.\n")
+```
+
+```{r cov}
+tbl(res$coverage, "Consistency and coverage of each path")
+```
+
+<div class="reading">
+**How to read this.** `cons` (consistency) says how reliably that combination
+leads to the outcome - above 0.75 is the usual minimum, above 0.80 is
+comfortable. `raw_cov` is how much of the outcome the path accounts for.
+`unique_cov` is the part **only** that path explains: a path with near-zero
+unique coverage is almost entirely redundant with the others.
+</div>
+
+```{r ball, results = "asis"}
+if (!is.null(res$ball_table) && nrow(res$ball_table) > 0) {
+  cat("### 2.1 Core and contributing conditions\n\n")
+  print(knitr::kable(as.data.frame(res$ball_table)))
+  cat("\n<div class=\"reading\">\n**Symbols.** &#9679; core condition, present &nbsp;|&nbsp; &#8855; core condition, absent &nbsp;|&nbsp; &#8226; contributing condition, present &nbsp;|&nbsp; &#8856; contributing condition, absent &nbsp;|&nbsp; blank = does not matter for that path.\n\nCore conditions appear in both the parsimonious and the intermediate solution, so they rest on the strongest evidence. Contributing conditions only survive once your directional expectations are imposed.\n</div>\n")
+} else {
+  cat("### 2.1 Core and contributing conditions\n\n_Not computed: this needs directional expectations (`DIRECTIONAL_EXPECTATIONS` in the script, `dir_exp` in `pfsqca_params()`)._\n")
+}
+```
+
+---
+
+## 3. Panel metrics
+
+The point of panel fsQCA: a solution that fits the pooled data can still be
+propped up by one period or a handful of cases. These three metrics separate
+those situations.
+
+### 3.1 Pooled (POCONS / POCOV)
+
+```{r pooled}
+tbl(res$panel_metrics$pooled)
+```
+
+```{r pooled-verdict, results = "asis"}
+pooled <- res$panel_metrics$pooled
+sol <- pooled[pooled$component == "solution", , drop = FALSE]
+cat(sprintf("<div class=\"reading\">\n**Overall solution: POCONS = %s, POCOV = %s.** Consistency of %s means that in %s%% of the membership mass where the solution holds, the outcome also holds. Coverage of %s means the solution accounts for %s%% of the outcome.\n</div>\n",
+            fmt(sol$POCONS[1]), fmt(sol$POCOV[1]), fmt(sol$POCONS[1]),
+            round(100 * as.numeric(sol$POCONS[1])), fmt(sol$POCOV[1]),
+            round(100 * as.numeric(sol$POCOV[1]))))
+```
+
+### 3.2 Between periods (BECONS / BECOV)
+
+```{r between}
+tbl(res$panel_metrics$between)
+```
+
+```{r between-verdict, results = "asis"}
+be <- res$panel_metrics$between
+spread <- max(be$BECONS, na.rm = TRUE) - min(be$BECONS, na.rm = TRUE)
+cat(sprintf("<div class=\"%s\">\n**Temporal stability.** BECONS ranges from %s to %s (spread of %s). %s\n</div>\n",
+            if (spread > 0.10) "warnbox" else "reading",
+            fmt(min(be$BECONS, na.rm = TRUE)), fmt(max(be$BECONS, na.rm = TRUE)), fmt(spread),
+            if (spread > 0.10) {
+              "That is a wide spread: the solution does not fit every period equally well. Look at which period is the outlier and say so explicitly in your write-up - a pooled number would hide it."
+            } else {
+              "The solution holds about equally well in every period, so the pooled result is not an artefact of one particular moment."
+            }))
+```
+
+### 3.3 Within cases (WICONS / WICOV)
+
+```{r within}
+wi <- res$panel_metrics$within
+data.frame(
+  Metric = c("Number of cases", "Mean WICONS", "SD WICONS",
+             "Share of cases with WICONS >= 0.70", "Lowest WICONS"),
+  Value = c(nrow(wi), fmt(mean(wi$WICONS, na.rm = TRUE)), fmt(stats::sd(wi$WICONS, na.rm = TRUE)),
+            fmt(mean(wi$WICONS >= 0.70, na.rm = TRUE)), fmt(min(wi$WICONS, na.rm = TRUE))),
+  stringsAsFactors = FALSE
+)
+```
+
+```{r within-worst}
+worst <- as.data.frame(wi)
+worst <- worst[order(worst$WICONS), ][seq_len(min(10, nrow(worst))), ]
+knitr::kable(worst, row.names = FALSE, digits = 3,
+             caption = "The ten cases the solution fits worst")
+```
+
+<div class="reading">
+**How to read this.** `WICONS` is the consistency of the solution computed
+inside each case, across its own periods. Cases at the bottom of this table are
+the ones your solution does not explain - they are exactly the cases worth
+looking at qualitatively.
+</div>
+
+---
+
+## 4. Sufficiency robustness
+
+```{r suf-rob, results = "asis"}
+if (is.null(res$sufficiency_robustness)) {
+  cat("_Robustness testing was switched off for this run._\n")
+} else {
+  ft <- res$sufficiency_robustness$freq_tbl
+  shown <- as.data.frame(utils::head(ft, 15))
+  shown$freq <- sprintf("%.0f%%", 100 * as.numeric(shown$freq))
+  names(shown)[names(shown) == "n"] <- "runs"
+  names(shown)[names(shown) == "freq"] <- "share_of_runs"
+  print(knitr::kable(shown, digits = 3,
+                     caption = "How often each path appears under random deletion"))
+  robust <- ft[ft$freq >= p$robust_PI_freq_cut, , drop = FALSE]
+  cat(sprintf("\n<div class=\"%s\">\n**Verdict.** Out of %d paths in the baseline solution, %d appear in at least %.0f%% of the %d random-deletion runs.%s\n</div>\n",
+              if (nrow(robust) == 0) "warnbox" else "reading",
+              length(res$terms), sum(robust$in_baseline, na.rm = TRUE),
+              p$robust_PI_freq_cut * 100, p$robustness_B,
+              if (nrow(robust) == 0) {
+                " No path clears the bar, so treat the solution as exploratory: it depends on which cases happen to be in the sample."
+              } else {
+                paste0(" The robust path(s): ", paste0("`", robust$term, "`", collapse = ", "), ".")
+              }))
+  cat("\n<div class=\"reading\">\n**Note.** A path with a high frequency that is *not* in the baseline (`in_baseline = FALSE`) is a hint that your baseline thresholds sit right on a knife edge.\n</div>\n")
+}
+```
+
+---
+
+## 5. Reporting checklist
+
+When you write this up, report all of the following - reviewers ask for them:
+
+- The calibration anchors (which percentiles, applied to which variables).
+- The consistency cutoff (`incl_cut` = `r p$incl_cut`) and the case cutoff (`n_cut` = `r p$n_cut`), and why you chose them.
+- The full necessity table, including `covN`, not only the conditions that passed.
+- Every sufficient path with its consistency, raw coverage and unique coverage.
+- The solution-level POCONS and POCOV.
+- The between-period and within-case spread, not just the pooled figure.
+- The robustness procedure (`r p$robustness_B` runs dropping `r p$robustness_drop * 100`% of cases) and which findings survived it.
+
+### References
+
+- Ragin, C. C. (2008). *Redesigning Social Inquiry: Fuzzy Sets and Beyond*. University of Chicago Press.
+- Emmenegger, P., Schraff, D., & Walter, A. (2014). QCA, the Truth Table Analysis and Large-N Survey Data. *COMPASSS Working Paper* 2014-79.
+- Schneider, C. Q., & Wagemann, C. (2012). *Set-Theoretic Methods for the Social Sciences*. Cambridge University Press.
+- Dusa, A. (2019). *QCA with R: A Comprehensive Resource*. Springer.
+
+```{r footer, results = "asis"}
+cat(sprintf("\n---\n\n_Generated by RobustPanelQCA %s on %s._\n",
+            as.character(utils::packageVersion("RobustPanelQCA")),
+            format(res$run_at, "%Y-%m-%d %H:%M:%S")))
+```

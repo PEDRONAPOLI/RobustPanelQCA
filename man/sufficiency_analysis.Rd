@@ -19,18 +19,39 @@ sufficiency_analysis(data, outcome, conditions, params = NULL)
 A list with:
 \describe{
 \item{tt}{The truth table object}
-\item{sol}{The minimized solution object}
-\item{terms}{Character vector of solution terms}
+\item{sol_parsimonious}{The parsimonious solution object}
+\item{sol_intermediate}{The intermediate solution object (NULL if no dir_exp)}
+\item{terms_parsimonious}{Character vector of parsimonious solution terms}
+\item{terms_intermediate}{Character vector of intermediate solution terms}
+\item{terms}{Character vector of final solution terms (intermediate if available, else parsimonious)}
+\item{core_contributing}{Data frame identifying core vs contributing conditions (NULL if no dir_exp)}
 }
 }
 \description{
-Performs truth table analysis and Boolean minimization.
+Performs truth table analysis and Boolean minimization. When directional
+expectations are provided, returns both parsimonious and intermediate solutions
+with core and contributing conditions identified.
 }
 \examples{
-\dontrun{
-params <- pfsqca_params()
-suf <- sufficiency_analysis(data_cal, "outcome", c("A", "B", "C"), params)
-suf$terms  # view solution terms
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+
+# Parsimonious only
+params <- pfsqca_params(incl_cut = 0.80, n_cut = 1)
+suf <- sufficiency_analysis(data_cal, "entrepreneurship", conditions, params)
+suf$terms
+
+\donttest{
+# With directional expectations, an intermediate solution is also returned
+params <- pfsqca_params(
+  incl_cut = 0.80, n_cut = 1,
+  dir_exp = c(infrastructure = 1, knowledge = 1, finance = 1, talent = 1)
+)
+suf <- sufficiency_analysis(data_cal, "entrepreneurship", conditions, params)
+suf$core_contributing  # shows core vs contributing
 }
 
 }

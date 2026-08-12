@@ -6,7 +6,7 @@
 \alias{RobustPanelQCA-package}
 \title{RobustPanelQCA: Robust Panel Fuzzy-Set Qualitative Comparative Analysis}
 \description{
-Implements panel fuzzy-set Qualitative Comparative Analysis (fsQCA) with comprehensive robustness testing. Provides pooled (POCONS), between-period (BECONS), and within-case (WICONS) consistency metrics for evaluating configurational stability across time and units. Includes random deletion robustness testing for both necessity and sufficiency.
+Implements panel fuzzy-set Qualitative Comparative Analysis (fsQCA) with comprehensive robustness testing. Provides pooled (POCONS), between-period (BECONS), and within-case (WICONS) consistency metrics for evaluating configurational stability across time and units. Includes random deletion robustness testing for both necessity and sufficiency, a single-call workflow with an HTML report, and a fill-in-the-blanks script for users who do not write R.
 }
 \seealso{
 Useful links:

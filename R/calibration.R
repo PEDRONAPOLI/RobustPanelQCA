@@ -72,17 +72,41 @@ calibrate_percentile <- function(x, probs = c(0.10, 0.50, 0.90)) {
 #'
 #' @return A data frame with calibrated variables (original values replaced).
 #'
+#' @details
+#' Calibration is applied to the pooled panel: all case-period observations of
+#' a variable share the same anchors, so a membership score of 0.8 means the
+#' same thing in period 1 and in period 3. Columns not listed in `vars`
+#' (identifiers, time, labels) are carried through untouched.
+#'
 #' @examples
-#' \dontrun{
-#' # Calibrate conditions and outcome
-#' data_cal <- calibrate_panel(data, c("income", "patents", "outcome"))
-#' }
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
+#' head(data_cal)
 #'
 #' @export
 calibrate_panel <- function(data, vars, probs = c(0.10, 0.50, 0.90)) {
+  check_columns(data, vars, "variable")
+
   data_out <- data
+  failed <- character(0)
   for (v in vars) {
-    data_out[[v]] <- calibrate_percentile(data_out[[v]], probs = probs)
+    calibrated <- calibrate_percentile(data_out[[v]], probs = probs)
+    if (all(is.na(calibrated)) && !all(is.na(data_out[[v]]))) failed <- c(failed, v)
+    data_out[[v]] <- calibrated
   }
+
+  if (length(failed) > 0) {
+    warning(
+      sprintf(
+        "Calibration returned only NA for: %s\n  This happens when a variable has (almost) no variation, so the percentile anchors collapse into a single value.\n  Check those columns, or drop them from the analysis.",
+        paste0("\"", failed, "\"", collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
   data_out
 }

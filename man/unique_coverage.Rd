@@ -32,10 +32,14 @@ Unique coverage measures how much is covered ONLY by that term and
 not by any other term in the solution.
 }
 \examples{
-\dontrun{
-suf <- sufficiency_analysis(data_cal, "outcome", conditions, params)
-cov <- unique_coverage(data_cal, "outcome", suf$terms)
-cov  # see coverage breakdown
-}
+conditions <- c("infrastructure", "knowledge", "finance", "talent")
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c(conditions, "entrepreneurship")
+)
+unique_coverage(
+  data_cal, "entrepreneurship",
+  terms = c("infrastructure*knowledge", "finance*talent")
+)
 
 }

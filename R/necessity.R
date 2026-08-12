@@ -12,14 +12,19 @@
 #'   (both presence and absence), including inclN, covN, and necessity flag.
 #'
 #' @examples
-#' \dontrun{
-#' params <- pfsqca_params()
-#' nec <- necessity_test(data_cal, "outcome", c("income", "patents"), params)
-#' }
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c("infrastructure", "knowledge", "entrepreneurship")
+#' )
+#' necessity_test(
+#'   data_cal, "entrepreneurship", c("infrastructure", "knowledge")
+#' )
 #'
 #' @export
 necessity_test <- function(data, outcome, conditions, params = NULL) {
   if (is.null(params)) params <- pfsqca_params()
+  check_columns(data, c(outcome, conditions), "variable")
+  check_calibrated(data, c(outcome, conditions))
 
   Y <- data[[outcome]]
   conds_all <- c(conditions, paste0("~", conditions))
@@ -49,25 +54,36 @@ necessity_test <- function(data, outcome, conditions, params = NULL) {
 #' @param data A data frame with calibrated fuzzy-set variables.
 #' @param outcome Character. Name of the outcome variable.
 #' @param conditions Character vector. Names of condition variables.
-#' @param id_var Character. Name of the case identifier variable. Default is "MSA".
-#' @param time_var Character. Name of the time variable. Default is "year".
+#' @param id_var Character. Name of the case identifier variable.
+#'   Default is "case_id".
+#' @param time_var Character. Name of the time variable. Default is "period".
 #'
 #' @return A list with two data frames:
 #' \describe{
 #'   \item{between}{Necessity metrics by time period (BECONS_N, BECOV_N)}
 #'   \item{within}{Necessity metrics by case (WICONS_N, WICOV_N)}
 #' }
+#' The grouping column keeps the name you passed in `time_var` / `id_var`.
 #'
 #' @examples
-#' \dontrun{
-#' diag <- necessity_panel_diagnostics(data_cal, "outcome", c("income", "patents"))
-#' diag$between  # by year
-#' diag$within   # by case
-#' }
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c("infrastructure", "knowledge", "entrepreneurship")
+#' )
+#' diag <- necessity_panel_diagnostics(
+#'   data_cal, "entrepreneurship", c("infrastructure", "knowledge")
+#' )
+#' head(diag$between)  # by period
+#' head(diag$within)   # by case
 #'
 #' @export
 necessity_panel_diagnostics <- function(data, outcome, conditions,
-                                        id_var = "MSA", time_var = "year") {
+                                        id_var = "case_id", time_var = "period") {
+  check_columns(data, c(outcome, conditions), "variable")
+  check_columns(data, time_var, "time variable")
+  check_columns(data, id_var, "case identifier")
+  check_calibrated(data, c(outcome, conditions))
+
   Y <- data[[outcome]]
   conds_all <- c(conditions, paste0("~", conditions))
 
@@ -75,14 +91,13 @@ necessity_panel_diagnostics <- function(data, outcome, conditions,
     Xfull <- literal_membership(data, cond)
     data %>%
       dplyr::mutate(.X = Xfull, .Y = Y) %>%
-      dplyr::group_by(.data[[time_var]]) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(time_var))) %>%
       dplyr::summarise(
         n = dplyr::n(),
         BECONS_N = cons_cov_nec(.X, .Y)["inclN"],
         BECOV_N = cons_cov_nec(.X, .Y)["covN"],
         .groups = "drop"
       ) %>%
-      dplyr::rename(year = .data[[time_var]]) %>%
       dplyr::mutate(condition = cond)
   })
 
@@ -90,14 +105,13 @@ necessity_panel_diagnostics <- function(data, outcome, conditions,
     Xfull <- literal_membership(data, cond)
     data %>%
       dplyr::mutate(.X = Xfull, .Y = Y) %>%
-      dplyr::group_by(.data[[id_var]]) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(id_var))) %>%
       dplyr::summarise(
         n = dplyr::n(),
         WICONS_N = cons_cov_nec(.X, .Y)["inclN"],
         WICOV_N = cons_cov_nec(.X, .Y)["covN"],
         .groups = "drop"
       ) %>%
-      dplyr::rename(case_id = .data[[id_var]]) %>%
       dplyr::mutate(condition = cond)
   })
 

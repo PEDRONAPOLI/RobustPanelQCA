@@ -149,32 +149,61 @@ parse_core_contributing <- function(pars_terms, int_terms, conditions) {
 #' }
 #'
 #' @examples
-#' \dontrun{
-#' # Parsimonious only
-#' params <- pfsqca_params()
-#' suf <- sufficiency_analysis(data_cal, "outcome", c("A", "B", "C"), params)
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
 #'
-#' # With intermediate solution
-#' params <- pfsqca_params(dir_exp = c(A = 1, B = 1, C = 0))
-#' suf <- sufficiency_analysis(data_cal, "outcome", c("A", "B", "C"), params)
+#' # Parsimonious only
+#' params <- pfsqca_params(incl_cut = 0.80, n_cut = 1)
+#' suf <- sufficiency_analysis(data_cal, "entrepreneurship", conditions, params)
+#' suf$terms
+#'
+#' \donttest{
+#' # With directional expectations, an intermediate solution is also returned
+#' params <- pfsqca_params(
+#'   incl_cut = 0.80, n_cut = 1,
+#'   dir_exp = c(infrastructure = 1, knowledge = 1, finance = 1, talent = 1)
+#' )
+#' suf <- sufficiency_analysis(data_cal, "entrepreneurship", conditions, params)
 #' suf$core_contributing  # shows core vs contributing
 #' }
 #'
 #' @export
 sufficiency_analysis <- function(data, outcome, conditions, params = NULL) {
   if (is.null(params)) params <- pfsqca_params()
+  check_columns(data, c(outcome, conditions), "variable")
+  check_calibrated(data, c(outcome, conditions))
+
+  thresholds_hint <- sprintf(
+    "  Current thresholds: incl_cut = %s, n_cut = %s, pri_cut = %s\n  Try lowering incl_cut, lowering n_cut, or using fewer conditions (%d conditions means %d possible configurations for %d observations).",
+    params$incl_cut, params$n_cut, params$pri_cut,
+    length(conditions), 2^length(conditions), nrow(data)
+  )
 
   # Create truth table
-  tt <- QCA::truthTable(
-    data = data,
-    outcome = outcome,
-    conditions = conditions,
-    incl.cut = params$incl_cut,
-    pri.cut = params$pri_cut,
-    n.cut = params$n_cut,
-    complete = TRUE,
-    show.cases = TRUE
+  tt <- tryCatch(
+    QCA::truthTable(
+      data = data,
+      outcome = outcome,
+      conditions = conditions,
+      incl.cut = params$incl_cut,
+      pri.cut = params$pri_cut,
+      n.cut = params$n_cut,
+      complete = TRUE,
+      show.cases = TRUE
+    ),
+    error = function(e) {
+      stop("Could not build the truth table: ", conditionMessage(e), "\n",
+           thresholds_hint, call. = FALSE)
+    }
   )
+
+  if (!any(tt$tt$OUT == 1, na.rm = TRUE)) {
+    stop("No truth table row reached the consistency cutoff, so there is nothing to minimize.\n",
+         thresholds_hint, call. = FALSE)
+  }
 
   # Parsimonious solution (always computed)
   sol_pars <- QCA::minimize(
@@ -237,8 +266,9 @@ sufficiency_analysis <- function(data, outcome, conditions, params = NULL) {
 #' @param data A data frame with calibrated fuzzy-set variables.
 #' @param outcome Character. Name of the outcome variable.
 #' @param sol_terms Character vector. Solution terms from sufficiency analysis.
-#' @param id_var Character. Name of the case identifier variable. Default is "MSA".
-#' @param time_var Character. Name of the time variable. Default is "year".
+#' @param id_var Character. Name of the case identifier variable.
+#'   Default is "case_id".
+#' @param time_var Character. Name of the time variable. Default is "period".
 #'
 #' @return A list with three data frames:
 #' \describe{
@@ -246,18 +276,30 @@ sufficiency_analysis <- function(data, outcome, conditions, params = NULL) {
 #'   \item{between}{BECONS and BECOV by time period}
 #'   \item{within}{WICONS and WICOV by case}
 #' }
+#' The grouping column keeps the name you passed in `time_var` / `id_var`.
 #'
 #' @examples
-#' \dontrun{
-#' suf <- sufficiency_analysis(data_cal, "outcome", conditions, params)
-#' pm <- panel_metrics(data_cal, "outcome", suf$terms)
+#' conditions <- c("infrastructure", "knowledge", "finance", "talent")
+#' data_cal <- calibrate_panel(
+#'   example_panel,
+#'   vars = c(conditions, "entrepreneurship")
+#' )
+#' pm <- panel_metrics(
+#'   data_cal, "entrepreneurship",
+#'   sol_terms = c("infrastructure*knowledge", "finance*talent")
+#' )
 #' pm$pooled   # overall metrics
-#' pm$between  # by year
-#' pm$within   # by case
-#' }
+#' pm$between  # by period
+#' head(pm$within)  # by case
 #'
 #' @export
-panel_metrics <- function(data, outcome, sol_terms, id_var = "MSA", time_var = "year") {
+panel_metrics <- function(data, outcome, sol_terms,
+                          id_var = "case_id", time_var = "period") {
+  check_columns(data, outcome, "outcome")
+  check_columns(data, time_var, "time variable")
+  check_columns(data, id_var, "case identifier")
+  check_calibrated(data, outcome)
+
   Y <- data[[outcome]]
 
   # Pooled metrics for each term
@@ -286,26 +328,24 @@ panel_metrics <- function(data, outcome, sol_terms, id_var = "MSA", time_var = "
   # Between metrics (by time period)
   by_year <- data %>%
     dplyr::mutate(.Y = Y, .Xsol = Xsol) %>%
-    dplyr::group_by(.data[[time_var]]) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(time_var))) %>%
     dplyr::summarise(
       n = dplyr::n(),
       BECONS = cons_cov_suf(.Xsol, .Y)["consistency"],
       BECOV = cons_cov_suf(.Xsol, .Y)["coverage"],
       .groups = "drop"
-    ) %>%
-    dplyr::rename(year = .data[[time_var]])
+    )
 
   # Within metrics (by case)
   by_case <- data %>%
     dplyr::mutate(.Y = Y, .Xsol = Xsol) %>%
-    dplyr::group_by(.data[[id_var]]) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(id_var))) %>%
     dplyr::summarise(
       n = dplyr::n(),
       WICONS = cons_cov_suf(.Xsol, .Y)["consistency"],
       WICOV = cons_cov_suf(.Xsol, .Y)["coverage"],
       .groups = "drop"
-    ) %>%
-    dplyr::rename(case_id = .data[[id_var]])
+    )
 
   list(pooled = pooled, between = by_year, within = by_case)
 }
@@ -325,10 +365,14 @@ panel_metrics <- function(data, outcome, sol_terms, id_var = "MSA", time_var = "
 #'   "•" (contributing present), "○" (contributing absent), "" (don't care).
 #'
 #' @examples
-#' \dontrun{
-#' suf <- sufficiency_analysis(data_cal, "outcome", conditions, params)
-#' ball_table <- create_ball_table(suf$core_contributing, conditions)
-#' }
+#' cc <- data.frame(
+#'   term      = c("A*B", "A*B", "C", "C"),
+#'   condition = c("A", "B", "C", "A"),
+#'   literal   = c("A", "B", "C", "~A"),
+#'   presence  = c("present", "present", "present", "absent"),
+#'   type      = c("core", "contributing", "core", "contributing")
+#' )
+#' create_ball_table(cc, conditions = c("A", "B", "C"))
 #'
 #' @export
 create_ball_table <- function(core_contributing, conditions) {

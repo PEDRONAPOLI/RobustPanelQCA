@@ -8,8 +8,8 @@ necessity_panel_diagnostics(
   data,
   outcome,
   conditions,
-  id_var = "MSA",
-  time_var = "year"
+  id_var = "case_id",
+  time_var = "period"
 )
 }
 \arguments{
@@ -19,9 +19,10 @@ necessity_panel_diagnostics(
 
 \item{conditions}{Character vector. Names of condition variables.}
 
-\item{id_var}{Character. Name of the case identifier variable. Default is "MSA".}
+\item{id_var}{Character. Name of the case identifier variable.
+Default is "case_id".}
 
-\item{time_var}{Character. Name of the time variable. Default is "year".}
+\item{time_var}{Character. Name of the time variable. Default is "period".}
 }
 \value{
 A list with two data frames:
@@ -29,16 +30,21 @@ A list with two data frames:
 \item{between}{Necessity metrics by time period (BECONS_N, BECOV_N)}
 \item{within}{Necessity metrics by case (WICONS_N, WICOV_N)}
 }
+The grouping column keeps the name you passed in \code{time_var} / \code{id_var}.
 }
 \description{
 Calculates between-period and within-case necessity metrics
 to assess stability of necessity relations across time and units.
 }
 \examples{
-\dontrun{
-diag <- necessity_panel_diagnostics(data_cal, "outcome", c("income", "patents"))
-diag$between  # by year
-diag$within   # by case
-}
+data_cal <- calibrate_panel(
+  example_panel,
+  vars = c("infrastructure", "knowledge", "entrepreneurship")
+)
+diag <- necessity_panel_diagnostics(
+  data_cal, "entrepreneurship", c("infrastructure", "knowledge")
+)
+head(diag$between)  # by period
+head(diag$within)   # by case
 
 }
